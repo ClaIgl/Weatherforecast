@@ -107,6 +107,8 @@ plt.plot(np.array(dp['Day cos'])[:25])
 
 plt.xlabel('Time [h]')
 plt.title('Time of day signal')
+plt.show()
+plt.close()
 
 plt.figure(5)
 plt.plot(np.array(dp['Year sin']))
@@ -114,11 +116,10 @@ plt.plot(np.array(dp['Year cos']))
 
 plt.xlabel('Time [h]')
 plt.title('Time of year signal')
-
+plt.show()
+plt.close()
 
 #%%
-
-column_indices = {name: i for i, name in enumerate(dp.columns)}
 
 n = len(dp)
 train_dp = dp[0:int(n*0.7)]
@@ -132,10 +133,11 @@ num_features = dp.shape[1]
 train_mean = train_dp.mean()
 train_std = train_dp.std()
 
-val_dp = (val_dp - train_dp.mean())/ train_dp.std()
-test_dp = (test_dp - train_dp.mean())/ train_dp.std()
-train_dp = (train_dp - train_dp.mean())/ train_dp.std()
+train_dp = (train_dp - train_mean)/ train_std
+val_dp = (val_dp - train_mean)/ train_std
+test_dp = (test_dp - train_mean)/ train_std
 
+train_dp.boxplot(rot=90)
 
 #%%
 
