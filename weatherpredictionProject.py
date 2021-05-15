@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import tensorflow as tf
-
+import keras
 
 
 data = pd.read_csv('/Users/claraiglhaut/Desktop/ZHAW/Neural Networks/Data_2020')
@@ -119,7 +119,7 @@ plt.title('Time of year signal')
 plt.show()
 plt.close()
 
-#%%
+#%% train, test, validation split 
 
 n = len(dp)
 train_dp = dp[0:int(n*0.7)]
@@ -148,10 +148,101 @@ features.plot(subplots=True)
 features.head()
 
 
-features_norm = train_dp[features_considered]
+train_data = train_dp[features_considered]
+val_data = val_dp[features_considered]
+test_data = test_dp[features_considered]
 
+#%% Build model
 
+def create_dataset(x, y, history_size,
+                      target_size, time_step=1):
+  xs = []
+  ys = []
 
+  for i in range(history_size, len(x) - target_size):
+    xindices = range(i-history_size, i, time_step)
+    xs.append(x.iloc[xindices])
+    yindices = range(i, i+target_size, time_step)
+    ys.append(y.iloc[yindices])
 
+  return np.array(xs), np.array(ys)
 
+'''def create_dataset(x, y, time_step =1):
+    xs = []
+    ys = []
+    for i in range(len(x)-time_step):
+        v = x.iloc[i:(i+time_step)].to_numpy()
+        xs.append(v)
+        ys.append(y.iloc[i])
+    return np.array(xs), np.array(ys)'''
+        
+past_history = 1
+future_target = 1
+step = 1
+data_train, labels_train = create_dataset(train_data, train_data['T (°C)'],
+                                          past_history,future_target,step)
+data_test, labels_test = create_dataset(test_data, test_data['T (°C)'],
+                                        past_history,future_target,step)
+data_val, labels_val = create_dataset(val_data, val_data['T (°C)'],
+                                      past_history,future_target,step)
 
+#%%
+BATCH_SIZE = 256
+BUFFER_SIZE = 10000
+
+x_train = tf.data.Dataset.from_tensor_slices((data_train, labels_train))
+x_train = x_train.cache().shuffle(BUFFER_SIZE).batch(BATCH_SIZE).repeat()
+
+x_test = tf.data.Dataset.from_tensor_slices((data_test, labels_test))
+x_test = x_test.cache().batch(BATCH_SIZE).repeat()
+
+single_step_model = tf.keras.models.Sequential()
+single_step_model.add(tf.keras.layers.LSTM(32,
+                                           input_shape=data_train.shape[-2:]))
+single_step_model.add(tf.keras.layers.Dense(1))
+
+single_step_model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
+
+# Let's check out a sample prediction.
+for x, y in x_test.take(1):
+  print(single_step_model.predict(x).shape)
+
+# TRAIN
+single_step_history = single_step_model.fit(data_train, epochs=10,
+                                            steps_per_epoch=100,
+                                            validation_data=x_test,
+                                            validation_steps=50)
+def plot_train_history(history, title):
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    
+    epochs = range(len(loss))
+    
+    plt.figure()
+    
+    plt.plot(epochs, loss, 'b', label='Training loss')
+    plt.plot(epochs, val_loss, 'r', label='Validation loss')
+    plt.title(title)
+    plt.legend()
+    
+    plt.show()
+    
+plot_train_history(history, 'Loss') 
+
+STEP = 1
+def multi_step_plot(history, true_future, prediction):
+    plt.figure(figsize=(12, 6))
+    num_in = list(range(-len(history), 0))
+    num_out = len(true_future)
+    plt.plot(num_in, np.array(history[:, 1]), label='History')
+    plt.plot(np.arange(num_out)/STEP, np.array(true_future), 'bo',
+             label='True Future')
+    if prediction.any():
+      plt.plot(np.arange(num_out)/STEP, np.array(prediction), 'ro',
+               label='Predicted Future')
+    plt.legend(loc='upper left')
+    plt.show() 
+#%%    
+for x, y in zip(data_val, labels_val):
+    multi_step_plot(x[0], y, model.predict(x)[0]) 
+    
