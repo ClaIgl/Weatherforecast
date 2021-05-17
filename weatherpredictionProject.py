@@ -247,9 +247,9 @@ def multi_step_plot(history, true_future, prediction):
                label='Predicted Future')
     plt.legend(loc='upper left')
     plt.show() 
-#%%    
-for x, y in zip(data_val, labels_val):
-    multi_step_plot(x[0], y, single_step_model.predict(np.expand_dims(x, axis=0))[0]) 
+#%% DO NOT RUN 
+'''for x, y in zip(data_val, labels_val):
+    multi_step_plot(x[0], y, single_step_model.predict(np.expand_dims(x, axis=0))[0]) '''
   
     
   
