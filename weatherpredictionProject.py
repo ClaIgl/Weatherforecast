@@ -88,7 +88,7 @@ plt.ylim([0, 40000])
 plt.xlim([0, 370])
 plt.xticks([1, 365.2524], labels=['1/Year', '1/day'])
 
-#%% Convert time of day and time of year signal
+#%% Convert time of day and time of year signal 
 time_delta = dp.index - datetime.datetime(2020, 1, 1)
 dp['sec'] = time_delta.total_seconds()
 
@@ -118,12 +118,10 @@ plt.xlabel('Time [h]')
 plt.title('Time of year signal')
 plt.show()
 plt.close()
-
 #%% feature heatmap
 corrMat = dp.corr()
-sns.heatmap(corrMat)
+sns.heatmap(corrMat) 
 plt.show()
-
 #%% train, test, validation split 
 
 n = len(dp)
@@ -135,8 +133,8 @@ num_features = dp.shape[1]
 
 #%% normalize data with mean 
 
-train_mean = train_dp.mean()
-train_std = train_dp.std()
+train_mean = train_dp.mean(axis=0)
+train_std = train_dp.std(axis=0)
 
 train_dp = (train_dp - train_mean)/ train_std
 val_dp = (val_dp - train_mean)/ train_std
@@ -160,17 +158,23 @@ test_data = test_dp[features_considered]
 #%% Build model
 
 def create_dataset(x, y, history_size,
-                      target_size, time_step=1):
-  xs = []
-  ys = []
+                      pred_time, time_step=1, single_pred = False):
+    x = x.values
+    y = y.values
+    
+    xs = []
+    ys = []
+      
+    for i in range(history_size, len(x) - pred_time):
+          xindices = range(i-history_size, i, time_step)
+          xs.append(x[xindices])
+          if single_pred:
+              ys.append(y[i+pred_time])
+          else:
+              yindices = range(i, i+pred_time, time_step)
+              ys.append(y[yindices])
 
-  for i in range(history_size, len(x) - target_size):
-    xindices = range(i-history_size, i, time_step)
-    xs.append(x.iloc[xindices])
-    yindices = range(i, i+target_size, time_step)
-    ys.append(y.iloc[yindices])
-
-  return np.array(xs), np.array(ys)
+    return np.array(xs), np.array(ys)
 
 '''def create_dataset(x, y, time_step =1):
     xs = []
@@ -182,41 +186,34 @@ def create_dataset(x, y, history_size,
     return np.array(xs), np.array(ys)'''
         
 past_history = 1
-future_target = 1
+future_target = 12
 step = 1
+
 data_train, labels_train = create_dataset(train_data, train_data['T (°C)'],
-                                          past_history,future_target,step)
+                                          past_history,future_target,step,single_pred=True)
 data_test, labels_test = create_dataset(test_data, test_data['T (°C)'],
-                                        past_history,future_target,step)
+                                        past_history,future_target,step,single_pred=True)
 data_val, labels_val = create_dataset(val_data, val_data['T (°C)'],
-                                      past_history,future_target,step)
+                                      past_history,future_target,step,single_pred=True)
 
 #%%
-BATCH_SIZE = 256
-BUFFER_SIZE = 10000
 
-x_train = tf.data.Dataset.from_tensor_slices((data_train, labels_train))
-x_train = x_train.cache().shuffle(BUFFER_SIZE).batch(BATCH_SIZE).repeat()
-
-x_test = tf.data.Dataset.from_tensor_slices((data_test, labels_test))
-x_test = x_test.cache().batch(BATCH_SIZE).repeat()
 
 single_step_model = tf.keras.models.Sequential()
 single_step_model.add(tf.keras.layers.LSTM(32,
-                                           input_shape=data_train.shape[-2:]))
+                                           input_shape=(data_train.shape[1], 
+                                                        data_train.shape[2]),
+                                           return_sequences=True))
 single_step_model.add(tf.keras.layers.Dense(1))
 
 single_step_model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
 
-# Let's check out a sample prediction.
-for x, y in x_test.take(1):
-  print(single_step_model.predict(x).shape)
+
 
 # TRAIN
-single_step_history = single_step_model.fit(data_train, epochs=10,
-                                            steps_per_epoch=100,
-                                            validation_data=x_test,
-                                            validation_steps=50)
+single_step_history = single_step_model.fit(data_train, labels_train, epochs=10,
+                                            batch_size=30,
+                                            validation_data=(data_test, labels_test))
 def plot_train_history(history, title):
     loss = history.history['loss']
     val_loss = history.history['val_loss']
@@ -232,14 +229,17 @@ def plot_train_history(history, title):
     
     plt.show()
     
-plot_train_history(history, 'Loss') 
-
+plot_train_history(single_step_history, 'Loss') 
+#%%
 STEP = 1
 def multi_step_plot(history, true_future, prediction):
     plt.figure(figsize=(12, 6))
     num_in = list(range(-len(history), 0))
-    num_out = len(true_future)
-    plt.plot(num_in, np.array(history[:, 1]), label='History')
+    try:
+        num_out = len(true_future)
+    except:
+        num_out = 1
+    plt.plot(num_in, np.array(history), label='History')
     plt.plot(np.arange(num_out)/STEP, np.array(true_future), 'bo',
              label='True Future')
     if prediction.any():
@@ -249,5 +249,15 @@ def multi_step_plot(history, true_future, prediction):
     plt.show() 
 #%%    
 for x, y in zip(data_val, labels_val):
-    multi_step_plot(x[0], y, model.predict(x)[0]) 
+    multi_step_plot(x[0], y, single_step_model.predict(np.expand_dims(x, axis=0))[0]) 
+  
     
+  
+    
+  
+    
+  
+    
+  
+    
+  
