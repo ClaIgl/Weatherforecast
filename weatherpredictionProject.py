@@ -88,7 +88,7 @@ plt.ylim([0, 40000])
 plt.xlim([0, 370])
 plt.xticks([1, 365.2524], labels=['1/Year', '1/day'])
 
-#%% Convert time of day and time of year signal - year signal is weird 
+#%% Convert time of day and time of year signal
 time_delta = dp.index - datetime.datetime(2020, 1, 1)
 dp['sec'] = time_delta.total_seconds()
 
@@ -118,6 +118,11 @@ plt.xlabel('Time [h]')
 plt.title('Time of year signal')
 plt.show()
 plt.close()
+
+#%% feature heatmap
+corrMat = dp.corr()
+sns.heatmap(corrMat)
+plt.show()
 
 #%% train, test, validation split 
 
