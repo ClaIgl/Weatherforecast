@@ -184,7 +184,8 @@ def create_dataset(x, y, history_size,
         xs.append(v)
         ys.append(y.iloc[i])
     return np.array(xs), np.array(ys)'''
-        
+
+#%% here change to single_pred = False does not work here 
 past_history = 1
 future_target = 12
 step = 1
