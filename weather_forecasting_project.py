@@ -28,11 +28,11 @@ data2017 = pd.read_csv('C:/Users/thoma/Desktop/Semester_2/deep_LEARNIG/project/u
 # subset data to one location and extract the parameters and values
 ds2020 = data2020.loc[data2020['Standort'] == 'Zch_Stampfenbachstrasse', :]
 dp2020 = ds2020.pivot_table(values='Wert', index='Datum', columns=['Parameter', 'Einheit'])
-ds2019 = data2019.loc[data2020['Standort'] == 'Zch_Stampfenbachstrasse', :]
+ds2019 = data2019.loc[data2019['Standort'] == 'Zch_Stampfenbachstrasse', :]
 dp2019 = ds2019.pivot_table(values='Wert', index='Datum', columns=['Parameter', 'Einheit'])
-ds2018 = data2018.loc[data2020['Standort'] == 'Zch_Stampfenbachstrasse', :]
+ds2018 = data2018.loc[data2018['Standort'] == 'Zch_Stampfenbachstrasse', :]
 dp2018 = ds2018.pivot_table(values='Wert', index='Datum', columns=['Parameter', 'Einheit'])
-ds2017= data2017.loc[data2020['Standort'] == 'Zch_Stampfenbachstrasse', :]
+ds2017= data2017.loc[data2017['Standort'] == 'Zch_Stampfenbachstrasse', :]
 dp2017 = ds2017.pivot_table(values='Wert', index='Datum', columns=['Parameter', 'Einheit'])
 
 frames = [dp2017,dp2018,dp2019,dp2020]
@@ -140,6 +140,12 @@ plt.close()
 corrMat = dp.corr()
 sns.heatmap(corrMat) 
 plt.show()
+
+#%% remove columns
+dp.pop('WVs (m/s)')
+dp.pop('WVv (m/s)')
+dp.pop('WD (°)')
+
 #%% train, test, validation split 
 
 
@@ -278,13 +284,15 @@ def multi_step_plot(history, true_future, prediction):
 
 
 data_pred = single_step_model.predict(data_test)
+labels_test_plot = (labels_test * train_std['T (°C)']) + train_mean['T (°C)']
+data_pred_plot = (data_pred * train_std['T (°C)']) + train_mean['T (°C)']
 
-
-plt.plot(data_test[0],'+-')
-plt.plot(data_pred,'+-')
+plt.plot(labels_test_plot,'-',label='True Future')
+plt.plot(data_pred_plot,'+',label='Predicted Future')
+plt.legend(loc='upper left')
   
     
-  
+
     
   
     
