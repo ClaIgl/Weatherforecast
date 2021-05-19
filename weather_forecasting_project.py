@@ -17,13 +17,27 @@ import tensorflow as tf
 from tensorflow import keras
 
 
-data = pd.read_csv('C:/Users/thoma/Desktop/Semester_2/deep_LEARNIG/project/ugz_ogd_meteo_h1_2020.csv')
+data2020 = pd.read_csv('C:/Users/thoma/Desktop/Semester_2/deep_LEARNIG/project/ugz_ogd_meteo_h1_2020.csv')
+data2019 = pd.read_csv('C:/Users/thoma/Desktop/Semester_2/deep_LEARNIG/project/ugz_ogd_meteo_h1_2019.csv')
+data2018 = pd.read_csv('C:/Users/thoma/Desktop/Semester_2/deep_LEARNIG/project/ugz_ogd_meteo_h1_2018.csv')
+data2017 = pd.read_csv('C:/Users/thoma/Desktop/Semester_2/deep_LEARNIG/project/ugz_ogd_meteo_h1_2017.csv')
+
 
 #%%
 
 # subset data to one location and extract the parameters and values
-ds = data.loc[data['Standort'] == 'Zch_Stampfenbachstrasse', :]
-dp = ds.pivot_table(values='Wert', index='Datum', columns=['Parameter', 'Einheit'])
+ds2020 = data2020.loc[data2020['Standort'] == 'Zch_Stampfenbachstrasse', :]
+dp2020 = ds2020.pivot_table(values='Wert', index='Datum', columns=['Parameter', 'Einheit'])
+ds2019 = data2019.loc[data2020['Standort'] == 'Zch_Stampfenbachstrasse', :]
+dp2019 = ds2019.pivot_table(values='Wert', index='Datum', columns=['Parameter', 'Einheit'])
+ds2018 = data2018.loc[data2020['Standort'] == 'Zch_Stampfenbachstrasse', :]
+dp2018 = ds2018.pivot_table(values='Wert', index='Datum', columns=['Parameter', 'Einheit'])
+ds2017= data2017.loc[data2020['Standort'] == 'Zch_Stampfenbachstrasse', :]
+dp2017 = ds2017.pivot_table(values='Wert', index='Datum', columns=['Parameter', 'Einheit'])
+
+frames = [dp2017,dp2018,dp2019,dp2020]
+dp = pd.concat(frames)
+
 
 dp.columns = [' ('.join(column)+')' for column in dp.columns]
 
@@ -88,9 +102,13 @@ plt.ylim([0, 40000])
 plt.xlim([0, 370])
 plt.xticks([1, 365.2524], labels=['1/Year', '1/day'])
 
-#%% Convert time of day and time of year signal - year signal is weird 
+#%% Convert time of day and time of year signal 
 time_delta = dp.index - datetime.datetime(2020, 1, 1)
 dp['sec'] = time_delta.total_seconds()
+dp['date'] = pd.to_datetime(dp.index)
+dp['month'] = dp['date'].dt.month
+dp['month'] = dp['month'].astype(int)
+dp.pop('date')
 
 day = 24*60*60
 year = (365.2425)*day
@@ -118,74 +136,160 @@ plt.xlabel('Time [h]')
 plt.title('Time of year signal')
 plt.show()
 plt.close()
-
+#%% feature heatmap
+corrMat = dp.corr()
+sns.heatmap(corrMat) 
+plt.show()
 #%% train, test, validation split 
 
+
+
 n = len(dp)
-train_dp = dp[0:int(n*0.9)]
+train_dp = dp[0:int(n*0.7)]
+val_dp = dp[int(n*0.7):int(n*0.9)]
 test_dp = dp[int(n*0.9):]
 
 num_features = dp.shape[1]
 
 #%% normalize data with mean 
 
-train_mean = train_dp.mean()
-train_std = train_dp.std()
+train_mean = train_dp.mean(axis=0)
+train_std = train_dp.std(axis=0)
 
 train_dp = (train_dp - train_mean)/ train_std
+val_dp = (val_dp - train_mean)/ train_std
 test_dp = (test_dp - train_mean)/ train_std
 
 train_dp.boxplot(rot=90)
 
-#%%
+#%% was selected befor normalisation
 
-input_features = ['p (hPa)', 'Hr (%Hr)', 'RainDur (min)', 'Wx (m/s)', 'Wy (m/s)', 'T (°C)']
-output_features = ['T (°C)']
+features_considered = ['T (°C)', 'p (hPa)', 'Hr (%Hr)', 'RainDur (min)']
+
+features = dp[features_considered]
+features.plot(subplots=True)
+features.head()
+
+
+train_data = train_dp[features_considered]
+val_data = val_dp[features_considered]
+test_data = test_dp[features_considered]
 
 
 
-train_input = train_dp[input_features]
-train_output = train_dp[output_features]
-test_input = test_dp[input_features]
-test_output = test_dp[output_features]
+#%% Build model
 
-#%%
-def create_dataset(x, y, time_step =1):
+def create_dataset(x, y, history_size,
+                      pred_time, time_step=1, single_pred = False):
+    x = x.values
+    y = y.values
+    
+    xs = []
+    ys = []
+      
+    for i in range(history_size, len(x) - pred_time):
+          xindices = range(i-history_size, i, time_step)
+          xs.append(x[xindices])
+          if single_pred:
+              ys.append(y[i+pred_time])
+          else:
+              yindices = range(i, i+pred_time, time_step)
+              ys.append(y[yindices])
+
+    return np.array(xs), np.array(ys)
+
+'''def create_dataset(x, y, time_step =1):
     xs = []
     ys = []
     for i in range(len(x)-time_step):
         v = x.iloc[i:(i+time_step)].to_numpy()
         xs.append(v)
-        ys.append(y.iloc[i + time_step])
-    return np.array(xs), np.array(ys)
+        ys.append(y.iloc[i])
+    return np.array(xs), np.array(ys)'''
+
+#%% here change to single_pred = False does not work here 
+past_history = 10
+future_target = 12
+step = 1
+
+data_train, labels_train = create_dataset(train_data, train_data['T (°C)'],
+                                          past_history,future_target,step,single_pred=False)
+data_test, labels_test = create_dataset(test_data, test_data['T (°C)'],
+                                        past_history,future_target,step,single_pred=False)
+data_val, labels_val = create_dataset(val_data, val_data['T (°C)'],
+                                      past_history,future_target,step,single_pred=False)
 
 #%%
-time_steps = 24
 
-x_train, y_train = create_dataset(train_input, train_output, time_step = time_steps)
-x_test, y_test = create_dataset(test_input, test_output, time_step = time_steps)
 
-print(x_train.shape)
+single_step_model = tf.keras.models.Sequential()
+single_step_model.add(keras.layers.Bidirectional(
+    keras.layers.LSTM(units=128,
+                      input_shape=(data_train.shape[1],data_train.shape[2]),
+                                           return_sequences=True)))
+single_step_model.add(keras.layers.Bidirectional(tf.keras.layers.LSTM(32, activation='relu')))
+single_step_model.add(keras.layers.Dense(units=1))
 
-model = keras.Sequential()
-model.add(keras.layers.Bidirectional(keras.layers.LSTM(units=128,input_shape=(x_train.shape[1],x_train.shape[2]))))
-model.add(keras.layers.Dropout(rate=0.01))
-model.add(keras.layers.Dense(units=1))
+single_step_model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
 
-model.compile(loss='mean_squared_error', optimizer='adam')
 
-history = model.fit(
-    x_train, y_train,
-    epochs=10,
-    batch_size=32,
-    validation_split= 0.1,
-    shuffle=False)
 
+# TRAIN
+single_step_history = single_step_model.fit(data_train, labels_train, epochs=10,
+                                            batch_size=30,
+                                            validation_data=(data_test, labels_test))
+def plot_train_history(history, title):
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    
+    epochs = range(len(loss))
+    
+    plt.figure()
+    
+    plt.plot(epochs, loss, 'b', label='Training loss')
+    plt.plot(epochs, val_loss, 'r', label='Validation loss')
+    plt.title(title)
+    plt.legend()
+    
+    plt.show()
+    
+plot_train_history(single_step_history, 'Loss') 
 #%%
-y_pred = model.predict(x_test)
+STEP = 1
+def multi_step_plot(history, true_future, prediction):
+    plt.figure(figsize=(12, 6))
+    num_in = list(range(-len(history), 0))
+    try:
+        num_out = len(true_future)
+    except:
+        num_out = 1
+    plt.plot(num_in, np.array(history), label='History')
+    plt.plot(np.arange(num_out)/STEP, np.array(true_future), 'bo',
+             label='True Future')
+    if prediction.any():
+      plt.plot(np.arange(num_out)/STEP, np.array(prediction), 'ro',
+               label='Predicted Future')
+    plt.legend(loc='upper left')
+    plt.show() 
+#%% DO NOT RUN 
+'''for x, y in zip(data_val, labels_val):
+    multi_step_plot(x[0], y, single_step_model.predict(np.expand_dims(x, axis=0))[0]) '''
+#%%    
 
-plt.plot(y_test)
-plt.plot(y_pred)
+
+data_pred = single_step_model.predict(data_test)
 
 
-
+plt.plot(data_test[0],'+-')
+plt.plot(data_pred,'+-')
+  
+    
+  
+    
+  
+    
+  
+    
+  
+    
+  
