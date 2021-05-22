@@ -74,6 +74,9 @@ ax.axis('tight')
 plt.show()
 plt.close()
 
+# drop
+dp = dp.drop(columns = ['WVs (m/s)', 'WVv (m/s)', 'WD (°)'])
+
 #%%
 fft = tf.signal.rfft(dp['T (°C)'])
 f_per_dataset = np.arange(0, len(fft))
@@ -89,6 +92,7 @@ plt.xlim([0, 370])
 plt.xticks([1, 365.2524], labels=['1/Year', '1/day'])
 
 #%% Convert time of day and time of year signal 
+
 time_delta = dp.index - datetime.datetime(2020, 1, 1)
 dp['sec'] = time_delta.total_seconds()
 
@@ -118,10 +122,14 @@ plt.xlabel('Time [h]')
 plt.title('Time of year signal')
 plt.show()
 plt.close()
+
+# drop sec column
+dp = dp.drop('sec', axis=1)
 #%% feature heatmap
 corrMat = dp.corr()
 sns.heatmap(corrMat) 
 plt.show()
+
 #%% train, test, validation split 
 
 n = len(dp)
@@ -144,7 +152,8 @@ train_dp.boxplot(rot=90)
 
 #%%
 
-features_considered = ['T (°C)', 'p (hPa)', 'Hr (%Hr)', 'RainDur (min)']
+features_considered = ['T (°C)', 'p (hPa)', 'Hr (%Hr)', 'RainDur (min)', 'Day sin',
+                       'Year sin','Wx (m/s)','Wy (m/s)', 'StrGlo (W/m2)']
 
 features = dp[features_considered]
 features.plot(subplots=True)
@@ -159,62 +168,88 @@ test_data = test_dp[features_considered]
 
 def create_dataset(x, y, history_size,
                       pred_time, time_step=1, single_pred = False):
+    
     x = x.values
     y = y.values
-    
+
     xs = []
     ys = []
       
     for i in range(history_size, len(x) - pred_time):
-          xindices = range(i-history_size, i, time_step)
-          xs.append(x[xindices])
-          if single_pred:
-              ys.append(y[i+pred_time])
-          else:
-              yindices = range(i, i+pred_time, time_step)
-              ys.append(y[yindices])
+        xindices = range(i-history_size, i, time_step)
+        xs.append(x[xindices])
+        if single_pred:
+            ys.append(y[i+pred_time])
+        else:
+            yindices = range(i, i+pred_time,time_step)
+            ys.append(y[yindices])
 
     return np.array(xs), np.array(ys)
 
-'''def create_dataset(x, y, time_step =1):
-    xs = []
-    ys = []
-    for i in range(len(x)-time_step):
-        v = x.iloc[i:(i+time_step)].to_numpy()
-        xs.append(v)
-        ys.append(y.iloc[i])
-    return np.array(xs), np.array(ys)'''
-
-#%% here change to single_pred = False does not work here 
-past_history = 1
+#%% Single prediction        
+past_history = 300
 future_target = 12
 step = 1
 
-data_train, labels_train = create_dataset(train_data, train_data['T (°C)'],
-                                          past_history,future_target,step,single_pred=True)
-data_test, labels_test = create_dataset(test_data, test_data['T (°C)'],
-                                        past_history,future_target,step,single_pred=True)
-data_val, labels_val = create_dataset(val_data, val_data['T (°C)'],
-                                      past_history,future_target,step,single_pred=True)
+data_train, labels_train = create_dataset(train_data, train_data[['Hr (%Hr)']],
+                                          past_history,future_target,step,single_pred = False)
+data_test, labels_test = create_dataset(test_data, test_data[['Hr (%Hr)']],
+                                        past_history,future_target,step,single_pred = False)
+data_val, labels_val = create_dataset(val_data, val_data[['Hr (%Hr)']],
+                                      past_history,future_target,step,single_pred = False)
 
 #%%
 
-
-single_step_model = tf.keras.models.Sequential()
-single_step_model.add(tf.keras.layers.LSTM(32,
+# model for two predictions
+'''model = tf.keras.models.Sequential()
+model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
                                            input_shape=(data_train.shape[1], 
-                                                        data_train.shape[2]),
-                                           return_sequences=True))
-single_step_model.add(tf.keras.layers.Dense(1))
+                                                        data_train.shape[2]))))
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.LSTM(16, activation='relu'))
+model.add(tf.keras.layers.Dense(12*2))
+model.add(tf.keras.layers.Reshape([12, 2]))
+model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')'''
 
-single_step_model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
+# model for one prediction overfits with history of 120 after epoch 5
+'''model = tf.keras.models.Sequential()
+model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
+                                           input_shape=(data_train.shape[1], 
+                                                        data_train.shape[2]))))
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.LSTM(16, activation='relu'))
+model.add(tf.keras.layers.Dense(12))
+model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')'''
 
+# still overfits but not as much
+'''model = tf.keras.models.Sequential()
+model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
+                                           input_shape=(data_train.shape[1], 
+                                                        data_train.shape[2]))))
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.LSTM(16, activation='relu'))
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Dense(12))
+model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')'''
+
+# no overfitting quite highest loss (~0.4 training and ~0.35 validation) 
+# (more epochs? smaller dropout? more data?)
+model = tf.keras.models.Sequential()
+model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
+                                           input_shape=(data_train.shape[1], 
+                                                        data_train.shape[2]))))
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(16, activation='softmax')))
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Dense(12))
+model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
 
 
 # TRAIN
-single_step_history = single_step_model.fit(data_train, labels_train, epochs=10,
-                                            batch_size=30,
-                                            validation_data=(data_test, labels_test))
+history = model.fit(data_train, labels_train, epochs=15,
+                                            batch_size=50,
+                                            validation_data=(data_val, labels_val))
+
 def plot_train_history(history, title):
     loss = history.history['loss']
     val_loss = history.history['val_loss']
@@ -230,33 +265,83 @@ def plot_train_history(history, title):
     
     plt.show()
     
-plot_train_history(single_step_history, 'Loss') 
+plot_train_history(history, 'Loss') 
+
 #%%
-STEP = 1
-def multi_step_plot(history, true_future, prediction):
+modelpath = '/Users/claraiglhaut/Desktop/ZHAW/Neural Networks/model.h5'
+pretrained_model = keras.models.load_model(modelpath)
+
+history = pretrained_model.fit(data_train, labels_train, epochs=15,
+                                            batch_size=50,
+                                            validation_data=(data_val, labels_val))
+
+def plot_train_history(history, title):
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    
+    epochs = range(len(loss))
+    
+    plt.figure()
+    
+    plt.plot(epochs, loss, 'b', label='Training loss')
+    plt.plot(epochs, val_loss, 'r', label='Validation loss')
+    plt.title(title)
+    plt.legend()
+    
+    plt.show()
+    
+plot_train_history(history, 'Loss') 
+#%%
+
+def multi_step_plot(history, true_future, prediction, STEP=1):
     plt.figure(figsize=(12, 6))
     num_in = list(range(-len(history), 0))
     try:
         num_out = len(true_future)
     except:
         num_out = 1
-    plt.plot(num_in, np.array(history), label='History')
-    plt.plot(np.arange(num_out)/STEP, np.array(true_future), 'bo',
+    plt.plot(num_in, history[:,0], label='History')
+    plt.plot(num_in, history[:,2], label='History')
+    plt.plot(np.arange(num_out)/STEP, np.array(true_future), 'b+',
              label='True Future')
     if prediction.any():
-      plt.plot(np.arange(num_out)/STEP, np.array(prediction), 'ro',
+      plt.plot(np.arange(num_out)/STEP, np.array(prediction), 'r+',
                label='Predicted Future')
     plt.legend(loc='upper left')
     plt.show() 
-#%% DO NOT RUN 
-'''for x, y in zip(data_val, labels_val):
-    multi_step_plot(x[0], y, single_step_model.predict(np.expand_dims(x, axis=0))[0]) '''
-  
     
+#%%  
+for x, y in list(zip(data_test, labels_test))[150:153]:
+    multi_step_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0])
   
-    
+#%% If we want to predict two features (can be adjusted to more than two)
   
+def multi_pred_plot(history, true_future, prediction, STEP=1):
+    plt.figure(figsize=(12, 6))
+    num_in = list(range(-len(history), 0))
+    try:
+        num_out = len(true_future)
+    except:
+        num_out = 1
     
+    fig, axs = plt.subplots(2,1)
+    axs[0].plot(num_in, history[:,0], label='History')
+    axs[0].plot(np.arange(num_out)/STEP, np.array(true_future[:,0]), 'b+',
+             label='True Future')
+    if prediction.any():
+      axs[0].plot(np.arange(num_out)/STEP, np.array(prediction[:,0]), 'r+',
+               label='Predicted Future')
+    axs[1].plot(num_in, history[:,2], label='History',c='r')
+    axs[1].plot(np.arange(num_out)/STEP, np.array(true_future[:,1]), 'b+',
+             label='True Future')
+    if prediction.any():
+      axs[1].plot(np.arange(num_out)/STEP, np.array(prediction[:,1]), 'r+',
+               label='Predicted Future')
+    plt.legend(loc='upper left', bbox_to_anchor=(0.005, 2.8))
+    plt.show()    
+  
+for x, y in list(zip(data_test, labels_test))[150:153]:
+    multi_pred_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0])   
   
     
   
