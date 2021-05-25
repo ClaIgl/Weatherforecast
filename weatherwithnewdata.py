@@ -63,7 +63,7 @@ def multi_step_plot(history, true_future, prediction, col_no, STEP=1):
     if prediction.any():
       plt.plot(np.arange(num_out)/STEP, np.array(prediction), 'r+',
                label='Predicted Future')
-    plt.legend(loc='upper left')
+    plt.legend(loc='upper left', bbox_to_anchor=(0.00, 1.1),ncol=3)
     plt.show() 
 
 def multi_pred_plot(history, true_future, prediction, list_col_no, STEP=1):
@@ -75,17 +75,16 @@ def multi_pred_plot(history, true_future, prediction, list_col_no, STEP=1):
         num_out = 1
     
     pred_no = len(list_col_no)
-    fig, axs = plt.subplots(pred_no,1)
+    fig, axs = plt.subplots(pred_no,1,sharex=True)
     
     for i in range(pred_no):
-        axs[i].plot(num_in, history[:,list_col_no[i]], label='History')
-        axs[i].plot(np.arange(num_out)/STEP, np.array(true_future[:,i]), 'b+',
-                 label='True Future')
+        axs[i].plot(num_in, history[:,list_col_no[i]])
+        axs[i].plot(np.arange(num_out)/STEP, np.array(true_future[:,i]),'+b')
         if prediction.any():
-          axs[i].plot(np.arange(num_out)/STEP, np.array(prediction[:,i]), 'r+',
-                   label='Predicted Future')
+          axs[i].plot(np.arange(num_out)/STEP, np.array(prediction[:,i]),'+r')
         
-    plt.legend(loc='upper left', bbox_to_anchor=(0.005, 2.8))
+    plt.legend(['History', 'True Future', 'Predicted Future'], 
+               loc='upper left', bbox_to_anchor=(0.00, 2.6), ncol=3)
     plt.show()    
     
 #%% LOADING DATA AND PREPROCESSING  
@@ -299,8 +298,10 @@ model.add(tf.keras.layers.Dropout(0.2))
 model.add(tf.keras.layers.Dense(12))
 model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')'''
 
-# model loss: 0.2283 - val_loss: 0.2003 history=300, future_target = 12
-# model loss: 0.2273 - val_loss: 0.1963 history=120, future_target = 12
+# model loss: 0.2283 - val_loss: 0.2003 history=300, future_target = 12, dropout=0.2
+# model loss: 0.2273 - val_loss: 0.1963 history=120, future_target = 12, dropout=0.2
+# model loss: 0.1809 - val_loss: 0.1889 history=120, future_target = 12, dropout=0.1, 15 epochs
+
 model = tf.keras.models.Sequential()
 model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
                                            input_shape=(X_train.shape[1], 
@@ -322,7 +323,55 @@ plot_train_history(history, 'Loss')
 #%%
 for x, y in list(zip(X_test, y_test))[0:3]:
     multi_step_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],3)
-#%% Prediction for two Parameters 
+
+#%% Prediction for two Parameters SunDur and Rain 
+
+features_considered = ['ST (°C)', 'StrGlo (W/m2)', 'p (hPa)', 'T (°C)', 'Snow (cm)',
+       'Rain (mm)', 'Hr (%)', 'SunDur (h)', 'Wx (m/s)', 'Wy (m/s)', 'Day sin',
+       'Year sin']
+
+train_X = train_data[features_considered]
+val_X = val_data[features_considered]
+test_X = test_data[features_considered]
+
+past_history = 120
+future_target = 12
+step = 1
+
+X_train, y_train = create_dataset(train_X, train_X[['Rain (mm)', 'SunDur (h)']],
+                                          past_history,future_target,step,single_pred = False)
+X_test, y_test = create_dataset(test_X, test_X[['Rain (mm)', 'SunDur (h)']],
+                                        past_history,future_target,step,single_pred = False)
+X_val, y_val = create_dataset(val_X, val_X[['Rain (mm)', 'SunDur (h)']],
+                                      past_history,future_target,step,single_pred = False)
+
+# model loss: 0.2576 - val_loss: 0.3001 
+model = tf.keras.models.Sequential()
+model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
+                                           input_shape=(X_train.shape[1], 
+                                                        X_train.shape[2]))))
+model.add(tf.keras.layers.Dropout(0.1))
+model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(16, activation='softmax')))
+model.add(tf.keras.layers.Dropout(0.1))
+model.add(tf.keras.layers.Dense(future_target*y_train.shape[2]))
+model.add(tf.keras.layers.Reshape([future_target, y_train.shape[2]]))
+model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
+
+# TRAIN
+history = model.fit(X_train, y_train, epochs=15,
+                                            batch_size=50,
+                                            validation_data=(X_val, y_val))
+
+
+plot_train_history(history, 'Loss') 
+
+for x, y in list(zip(X_test, y_test))[0:4]:
+    multi_pred_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],[5,7])
+
+#%% 
+
+
+
 
 
 
