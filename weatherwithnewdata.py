@@ -46,17 +46,18 @@ def plot_train_history(history, title):
     plt.plot(epochs, val_loss, 'r', label='Validation loss')
     plt.title(title)
     plt.legend()
+    plt.ylim(0.0,1.0)
     
     plt.show()
 
-def multi_step_plot(history, true_future, prediction, STEP=1):
+def multi_step_plot(history, true_future, prediction, col_no, STEP=1):
     plt.figure(figsize=(12, 6))
     num_in = list(range(-len(history), 0))
     try:
         num_out = len(true_future)
     except:
         num_out = 1
-    plt.plot(num_in, history[:,0], label='History')
+    plt.plot(num_in, history[:,col_no], label='History')
     plt.plot(np.arange(num_out)/STEP, np.array(true_future), 'b+',
              label='True Future')
     if prediction.any():
@@ -65,7 +66,7 @@ def multi_step_plot(history, true_future, prediction, STEP=1):
     plt.legend(loc='upper left')
     plt.show() 
 
-def multi_pred_plot(history, true_future, prediction, list_column, STEP=1):
+def multi_pred_plot(history, true_future, prediction, list_col_no, STEP=1):
     plt.figure(figsize=(12, 6))
     num_in = list(range(-len(history), 0))
     try:
@@ -73,11 +74,11 @@ def multi_pred_plot(history, true_future, prediction, list_column, STEP=1):
     except:
         num_out = 1
     
-    pred_no = len(list_column)
+    pred_no = len(list_col_no)
     fig, axs = plt.subplots(pred_no,1)
     
     for i in range(pred_no):
-        axs[i].plot(num_in, history[:,list_column[i]], label='History')
+        axs[i].plot(num_in, history[:,list_col_no[i]], label='History')
         axs[i].plot(np.arange(num_out)/STEP, np.array(true_future[:,i]), 'b+',
                  label='True Future')
         if prediction.any():
@@ -266,7 +267,7 @@ train_X = train_data[features_considered]
 val_X = val_data[features_considered]
 test_X = test_data[features_considered]
 
-past_history = 300
+past_history = 120
 future_target = 12
 step = 1
 
@@ -277,7 +278,7 @@ X_test, y_test = create_dataset(test_X, test_X[['T (°C)']],
 X_val, y_val = create_dataset(val_X, val_X[['T (°C)']],
                                       past_history,future_target,step,single_pred = False)
 
-# model for one prediction overfits with history of 120 after epoch 5
+# model loss: 0.1522 - val_loss: 0.1748 history=120, future target = 12
 '''model = tf.keras.models.Sequential()
 model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
                                            input_shape=(X_train.shape[1], 
@@ -287,7 +288,7 @@ model.add(tf.keras.layers.LSTM(16, activation='relu'))
 model.add(tf.keras.layers.Dense(12))
 model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')'''
 
-# still overfits but not as much
+# model 
 '''model = tf.keras.models.Sequential()
 model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
                                            input_shape=(X_train.shape[1], 
@@ -298,27 +299,29 @@ model.add(tf.keras.layers.Dropout(0.2))
 model.add(tf.keras.layers.Dense(12))
 model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')'''
 
-# no overfitting quite highest loss (~0.4 training and ~0.35 validation) 
-# (more epochs? smaller dropout? more data?)
+# model loss: 0.2283 - val_loss: 0.2003 history=300, future_target = 12
+# model loss: 0.2273 - val_loss: 0.1963 history=120, future_target = 12
 model = tf.keras.models.Sequential()
 model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
                                            input_shape=(X_train.shape[1], 
                                                         X_train.shape[2]))))
-model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Dropout(0.1))
 model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(16, activation='softmax')))
-model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Dropout(0.1))
 model.add(tf.keras.layers.Dense(12))
 model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
 
 # TRAIN
-history = model.fit(X_train, y_train, epochs=10,
+history = model.fit(X_train, y_train, epochs=15,
                                             batch_size=50,
                                             validation_data=(X_val, y_val))
 
 
 plot_train_history(history, 'Loss') 
+
+#%%
 for x, y in list(zip(X_test, y_test))[0:3]:
-    multi_step_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0])
+    multi_step_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],3)
 #%% Prediction for two Parameters 
 
 
