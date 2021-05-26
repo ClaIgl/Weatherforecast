@@ -166,7 +166,7 @@ plt.show()
 plt.close()
 
 # drop columns we do not need 
-data = data.drop(columns = ['WVs (m/s)',  'WD (°)'])
+# data = data.drop(columns = ['WVs (m/s)',  'WD (°)'])
 
 #%% Show year and day signal for Temperature
 fft = tf.signal.rfft(data['T (°C)'])
@@ -257,10 +257,6 @@ features_considered = ['ST (°C)', 'StrGlo (W/m2)', 'p (hPa)', 'T (°C)', 'Snow 
        'Rain (mm)', 'Hr (%)', 'SunDur (h)', 'Wx (m/s)', 'Wy (m/s)', 'Day sin',
        'Year sin']
 
-features = data[features_considered]
-features.plot(subplots=True)
-features.head()
-
 
 train_X = train_data[features_considered]
 val_X = val_data[features_considered]
@@ -301,13 +297,15 @@ model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')'''
 # model loss: 0.2283 - val_loss: 0.2003 history=300, future_target = 12, dropout=0.2
 # model loss: 0.2273 - val_loss: 0.1963 history=120, future_target = 12, dropout=0.2
 # model loss: 0.1809 - val_loss: 0.1889 history=120, future_target = 12, dropout=0.1, 15 epochs
-
+# model loss: 0.1769 - val_loss: 0.1810  
 model = tf.keras.models.Sequential()
-model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
-                                           input_shape=(X_train.shape[1], 
-                                                        X_train.shape[2]))))
-model.add(tf.keras.layers.Dropout(0.1))
-model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(16, activation='softmax')))
+model.add(tf.keras.layers.Bidirectional(
+    tf.keras.layers.LSTM(32, input_shape=(X_train.shape[1], X_train.shape[2])))) 
+
+model.add(tf.keras.layers.RepeatVector(X_train.shape[2]))  
+#model.add(tf.keras.layers.Attention(32)) 
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(24, activation='relu')))
 model.add(tf.keras.layers.Dropout(0.1))
 model.add(tf.keras.layers.Dense(12))
 model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
@@ -335,7 +333,7 @@ val_X = val_data[features_considered]
 test_X = test_data[features_considered]
 
 past_history = 120
-future_target = 12
+future_target = 24
 step = 1
 
 X_train, y_train = create_dataset(train_X, train_X[['Rain (mm)', 'SunDur (h)']],
@@ -347,9 +345,56 @@ X_val, y_val = create_dataset(val_X, val_X[['Rain (mm)', 'SunDur (h)']],
 
 # model loss: 0.2576 - val_loss: 0.3001 
 model = tf.keras.models.Sequential()
-model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequences=True,
-                                           input_shape=(X_train.shape[1], 
-                                                        X_train.shape[2]))))
+model.add(tf.keras.layers.Bidirectional(
+    tf.keras.layers.LSTM(32, input_shape=(X_train.shape[1], X_train.shape[2]))))
+
+model.add(tf.keras.layers.RepeatVector(X_train.shape[2])) 
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(16, activation='softmax')))
+model.add(tf.keras.layers.Dropout(0.1))
+model.add(tf.keras.layers.Dense(future_target*y_train.shape[2]))
+model.add(tf.keras.layers.Reshape([future_target, y_train.shape[2]]))
+model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
+
+# TRAIN
+history = model.fit(X_train, y_train, epochs=15,
+                                            batch_size=50,
+                                            validation_data=(X_val, y_val))
+
+
+plot_train_history(history, 'Loss') 
+#%%
+for x, y in list(zip(X_test, y_test))[100:250]:
+    multi_pred_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],[5,7])
+
+#%% Prediction for two Parameters ST (°C) and Snow (cm)
+
+features_considered = ['ST (°C)', 'StrGlo (W/m2)', 'p (hPa)', 'T (°C)', 'Snow (cm)',
+       'Rain (mm)', 'Hr (%)', 'SunDur (h)', 'Wx (m/s)', 'Wy (m/s)', 'Day sin',
+       'Year sin']
+
+train_X = train_data[features_considered]
+val_X = val_data[features_considered]
+test_X = test_data[features_considered]
+
+past_history = 120
+future_target = 24
+step = 1
+
+X_train, y_train = create_dataset(train_X, train_X[['ST (°C)', 'T (°C)']],
+                                          past_history,future_target,step,single_pred = False)
+X_test, y_test = create_dataset(test_X, test_X[['ST (°C)', 'T (°C)']],
+                                        past_history,future_target,step,single_pred = False)
+X_val, y_val = create_dataset(val_X, val_X[['ST (°C)', 'T (°C)']],
+                                      past_history,future_target,step,single_pred = False)
+
+# model loss: 0.1607 - val_loss: 0.1597
+# model loss: 0.1421 - val_loss: 0.1762, first layer 64
+model = tf.keras.models.Sequential()
+model.add(tf.keras.layers.Bidirectional(
+    tf.keras.layers.LSTM(32, input_shape=(X_train.shape[1], X_train.shape[2]))))
+
+model.add(tf.keras.layers.RepeatVector(X_train.shape[2])) 
 model.add(tf.keras.layers.Dropout(0.1))
 model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(16, activation='softmax')))
 model.add(tf.keras.layers.Dropout(0.1))
@@ -364,13 +409,9 @@ history = model.fit(X_train, y_train, epochs=15,
 
 
 plot_train_history(history, 'Loss') 
-
-for x, y in list(zip(X_test, y_test))[0:4]:
-    multi_pred_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],[5,7])
-
-#%% 
-
-
+#%%
+for x, y in list(zip(X_test, y_test))[0:3]:
+    multi_pred_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],[0,3])
 
 
 
