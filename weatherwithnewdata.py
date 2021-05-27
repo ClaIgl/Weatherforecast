@@ -367,7 +367,7 @@ plot_train_history(history, 'Loss')
 for x, y in list(zip(X_test, y_test))[100:250]:
     multi_pred_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],[5,7])
 
-#%% Prediction for two Parameters ST (°C) and Snow (cm)
+#%% Prediction for two Parameters ST (°C) and T (°C)
 
 features_considered = ['ST (°C)', 'StrGlo (W/m2)', 'p (hPa)', 'T (°C)', 'Snow (cm)',
        'Rain (mm)', 'Hr (%)', 'SunDur (h)', 'Wx (m/s)', 'Wy (m/s)', 'Day sin',
