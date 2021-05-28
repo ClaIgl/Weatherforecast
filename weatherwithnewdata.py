@@ -46,7 +46,7 @@ def plot_train_history(history, title):
     plt.plot(epochs, val_loss, 'r', label='Validation loss')
     plt.title(title)
     plt.legend()
-    plt.ylim(0.0,1.0)
+   
     
     plt.show()
 
