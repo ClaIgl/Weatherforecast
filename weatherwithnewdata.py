@@ -50,23 +50,26 @@ def plot_train_history(history, title):
     
     plt.show()
 
-def multi_step_plot(history, true_future, prediction, col_no, STEP=1):
+def multi_step_plot(history, true_future, prediction, col_no, train_std, 
+                    train_mean, STEP=1):
+    
     plt.figure(figsize=(12, 6))
     num_in = list(range(-len(history), 0))
     try:
         num_out = len(true_future)
     except:
         num_out = 1
-    plt.plot(num_in, history[:,col_no], label='History')
-    plt.plot(np.arange(num_out)/STEP, np.array(true_future), 'b+',
+    plt.plot(num_in, history[:,col_no]*train_std[col_no] + train_mean[col_no], label='History')
+    plt.plot(np.arange(num_out)/STEP, np.array(true_future)*train_std[col_no] + train_mean[col_no], 'b+',
              label='True Future')
     if prediction.any():
-      plt.plot(np.arange(num_out)/STEP, np.array(prediction), 'r+',
+      plt.plot(np.arange(num_out)/STEP, np.array(prediction)*train_std[col_no] + train_mean[col_no], 'r+',
                label='Predicted Future')
     plt.legend(loc='upper left', bbox_to_anchor=(0.00, 1.1),ncol=3)
     plt.show() 
 
-def multi_pred_plot(history, true_future, prediction, list_col_no, STEP=1):
+def multi_pred_plot(history, true_future, prediction, list_col_no, train_std, 
+                    train_mean, STEP=1):
     plt.figure(figsize=(12, 6))
     num_in = list(range(-len(history), 0))
     try:
@@ -78,10 +81,13 @@ def multi_pred_plot(history, true_future, prediction, list_col_no, STEP=1):
     fig, axs = plt.subplots(pred_no,1,sharex=True)
     
     for i in range(pred_no):
-        axs[i].plot(num_in, history[:,list_col_no[i]])
-        axs[i].plot(np.arange(num_out)/STEP, np.array(true_future[:,i]),'+b')
+        axs[i].plot(num_in, history[:,list_col_no[i]]*train_std[list_col_no[i]] 
+                    + train_mean[list_col_no[i]])
+        axs[i].plot(np.arange(num_out)/STEP, np.array(true_future[:,i])*train_std[list_col_no[i]] 
+                    + train_mean[list_col_no[i]],'+b')
         if prediction.any():
-          axs[i].plot(np.arange(num_out)/STEP, np.array(prediction[:,i]),'+r')
+          axs[i].plot(np.arange(num_out)/STEP, np.array(prediction[:,i])*train_std[list_col_no[i]] 
+                    + train_mean[list_col_no[i]],'+r')
         
     plt.legend(['History', 'True Future', 'Predicted Future'], 
                loc='upper left', bbox_to_anchor=(0.00, 2.6), ncol=3)
@@ -307,7 +313,7 @@ model.add(tf.keras.layers.RepeatVector(X_train.shape[2]))
 model.add(tf.keras.layers.Dropout(0.2))
 model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(24, activation='relu')))
 model.add(tf.keras.layers.Dropout(0.1))
-model.add(tf.keras.layers.Dense(12))
+model.add(tf.keras.layers.Dense(2))
 model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
 
 # TRAIN
@@ -320,7 +326,8 @@ plot_train_history(history, 'Loss')
 
 #%%
 for x, y in list(zip(X_test, y_test))[0:3]:
-    multi_step_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],3)
+    multi_step_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],3,
+                    train_std, train_mean)
 
 #%% Prediction for two Parameters SunDur and Rain 
 
@@ -333,7 +340,7 @@ val_X = val_data[features_considered]
 test_X = test_data[features_considered]
 
 past_history = 120
-future_target = 24
+future_target = 12
 step = 1
 
 X_train, y_train = create_dataset(train_X, train_X[['Rain (mm)', 'SunDur (h)']],
@@ -364,8 +371,9 @@ history = model.fit(X_train, y_train, epochs=15,
 
 plot_train_history(history, 'Loss') 
 #%%
-for x, y in list(zip(X_test, y_test))[100:250]:
-    multi_pred_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],[5,7])
+for x, y in list(zip(X_test, y_test))[100:103]:
+    multi_pred_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],[5,7],
+                    train_std, train_mean)
 
 #%% Prediction for two Parameters ST (°C) and T (°C)
 
@@ -378,7 +386,7 @@ val_X = val_data[features_considered]
 test_X = test_data[features_considered]
 
 past_history = 120
-future_target = 24
+future_target = 12
 step = 1
 
 X_train, y_train = create_dataset(train_X, train_X[['ST (°C)', 'T (°C)']],
@@ -411,7 +419,8 @@ history = model.fit(X_train, y_train, epochs=15,
 plot_train_history(history, 'Loss') 
 #%%
 for x, y in list(zip(X_test, y_test))[0:3]:
-    multi_pred_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],[0,3])
+    multi_pred_plot(x, y, model.predict(np.expand_dims(x, axis=0))[0],[0,3],
+                    train_std, train_mean)
 
 
 
