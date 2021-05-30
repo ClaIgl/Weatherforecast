@@ -46,7 +46,6 @@ def plot_train_history(history, title):
     plt.plot(epochs, val_loss, 'r', label='Validation loss')
     plt.title(title)
     plt.legend()
-   
     
     plt.show()
 
@@ -197,14 +196,11 @@ day = 24*60*60
 year = (365.2425)*day
 
 data['Day sin'] = np.sin(data['sec'] * (2*np.pi/day))
-#data['Day cos'] = np.cos(dp['sec'] * (2*np.pi/day))
 
 data['Year sin'] = np.sin(data['sec'] * (2*np.pi/year))
-#data['Year cos'] = np.cos(data['sec'] * (2*np.pi/year))
 
 plt.figure(4)
 plt.plot(np.array(data['Day sin'])[:25])
-#plt.plot(np.array(data['Day cos'])[:25])
 
 plt.xlabel('Time [h]')
 plt.title('Time of day signal')
@@ -213,7 +209,6 @@ plt.close()
 
 plt.figure(5)
 plt.plot(np.array(data['Year sin']))
-#plt.plot(np.array(dp['Year cos']))
 
 plt.xlabel('Time [h]')
 plt.title('Time of year signal')
@@ -255,7 +250,7 @@ fig = plt.gcf()
 fig.set_size_inches(10,12)
 
 
-#%% BUILDING MODELS
+#%% BUILDING THE MODEL
 
 #%% Prediction for a single parameter T with all features
 
@@ -286,7 +281,7 @@ model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequence
                                                         X_train.shape[2]))))
 model.add(tf.keras.layers.Dropout(0.2))
 model.add(tf.keras.layers.LSTM(16, activation='relu'))
-model.add(tf.keras.layers.Dense(12))
+model.add(tf.keras.layers.Dense(future_target*y_train.shape[2]))
 model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')'''
 
 # model 
@@ -297,7 +292,7 @@ model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(32, return_sequence
 model.add(tf.keras.layers.Dropout(0.2))
 model.add(tf.keras.layers.LSTM(16, activation='relu'))
 model.add(tf.keras.layers.Dropout(0.2))
-model.add(tf.keras.layers.Dense(12))
+model.add(tf.keras.layers.Dense(future_target*y_train.shape[2]))
 model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')'''
 
 # model loss: 0.2283 - val_loss: 0.2003 history=300, future_target = 12, dropout=0.2
@@ -311,10 +306,11 @@ model.add(tf.keras.layers.Bidirectional(
 model.add(tf.keras.layers.RepeatVector(X_train.shape[2]))  
 #model.add(tf.keras.layers.Attention(32)) 
 model.add(tf.keras.layers.Dropout(0.2))
-model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(24, activation='relu')))
-model.add(tf.keras.layers.Dropout(0.1))
-model.add(tf.keras.layers.Dense(2))
-model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
+model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(24, activation='softmax')))
+model.add(tf.keras.layers.Dropout(0.2))
+model.add(tf.keras.layers.Dense(future_target*y_train.shape[2]))
+model.add(tf.keras.layers.Reshape([future_target, y_train.shape[2]]))
+model.compile(optimizer=tf.keras.optimizers.RMSprop(learning_rate=0.01), loss='mae')
 
 # TRAIN
 history = model.fit(X_train, y_train, epochs=15,
@@ -358,7 +354,7 @@ model.add(tf.keras.layers.Bidirectional(
 model.add(tf.keras.layers.RepeatVector(X_train.shape[2])) 
 model.add(tf.keras.layers.Dropout(0.2))
 model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(16, activation='softmax')))
-model.add(tf.keras.layers.Dropout(0.1))
+model.add(tf.keras.layers.Dropout(0.2))
 model.add(tf.keras.layers.Dense(future_target*y_train.shape[2]))
 model.add(tf.keras.layers.Reshape([future_target, y_train.shape[2]]))
 model.compile(optimizer=tf.keras.optimizers.RMSprop(), loss='mae')
