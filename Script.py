@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu May 13 08:51:37 2021
+Created on Tue May 25 09:17:37 2021
 
 @author: claraiglhaut
 """
@@ -119,8 +119,6 @@ def multi_pred_plot(history, true_future, prediction, list_col_no, train_std,
 #%% LOADING DATA AND PREPROCESSING  
 
 plt.rcParams["figure.figsize"] = (9,5)
-
-#file = '/Users/claraiglhaut/Desktop/ZHAW/Neural Networks/order95021/order_95021_data.txt'
 
 file = os.path.realpath('order95021/order_95021_data.txt')
 data = pd.read_csv(file, delimiter=';')
@@ -301,61 +299,59 @@ test_X = test_data[features_considered]
 
 #%% Prediction for a single parameter air temperature T (°C) with all features
 
-#%% Hyperparameter tuning: EXAMPLE - size of first layer
+#%% Hyperparameter tuning: EXAMPLE - units in the first layer
 
-parameter_optimisation = [12, 24, 32, 64]
-fig = plt.figure()
+# =============================================================================
+# parameter_optimisation = [12, 24, 32, 64]
+# fig = plt.figure()
+# 
+# for current_value in parameter_optimisation:
+# 
+#     past_history = 120
+#     future_target = 12
+#     step = 1
+# 
+#     X_train, y_train = create_dataset(
+#         train_X, train_X[['T (°C)']], past_history,future_target,
+#         step,single_pred = False)
+#     
+#     X_test, y_test = create_dataset(
+#         test_X, test_X[['T (°C)']], past_history,future_target, step, 
+#         single_pred = False)
+#     
+#     X_val, y_val = create_dataset(
+#         val_X, val_X[['T (°C)']], past_history,future_target,step,
+#         single_pred = False)
+# 
+# 
+#     model = tf.keras.models.Sequential()
+#     model.add(tf.keras.layers.Bidirectional(
+#         tf.keras.layers.LSTM(
+#             current_value, input_shape=(X_train.shape[1], X_train.shape[2])))) 
+# 
+#     model.add(tf.keras.layers.RepeatVector(X_train.shape[2]))  
+#     model.add(tf.keras.layers.Dropout(0.1))
+#     model.add(tf.keras.layers.Bidirectional(
+#         tf.keras.layers.LSTM(32, activation='softmax')))
+#     model.add(tf.keras.layers.Dropout(0.2))
+#     model.add(tf.keras.layers.Dense(future_target))
+#     model.compile(
+#         optimizer=tf.keras.optimizers.RMSprop(learning_rate=0.001), loss='mae')
+# 
+#     # TRAIN
+#     history = model.fit(X_train, y_train, epochs=15,
+#                                             batch_size=50,
+#                                             validation_data=(X_val, y_val))
+#     
+#     plt.plot(current_value, history.history['loss'][-1], 'ob')
+#     plt.plot(current_value, history.history['val_loss'][-1], 'or')
+#     
+# plt.legend(['Training loss', 'Validation loss'], loc='upper right', ncol=2)
+# plt.xlabel('First Layer Units')
+# plt.ylabel('Loss')
+# 
+# =============================================================================
 
-for current_value in parameter_optimisation:
-
-    past_history = 120
-    future_target = 12
-    step = 1
-
-    X_train, y_train = create_dataset(
-        train_X, train_X[['T (°C)']], past_history,future_target,
-        step,single_pred = False)
-    
-    X_test, y_test = create_dataset(
-        test_X, test_X[['T (°C)']], past_history,future_target, step, 
-        single_pred = False)
-    
-    X_val, y_val = create_dataset(
-        val_X, val_X[['T (°C)']], past_history,future_target,step,
-        single_pred = False)
-
-
-    model = tf.keras.models.Sequential()
-    model.add(tf.keras.layers.Bidirectional(
-        tf.keras.layers.LSTM(
-            current_value, input_shape=(X_train.shape[1], X_train.shape[2])))) 
-
-    model.add(tf.keras.layers.RepeatVector(X_train.shape[2]))  
-    model.add(tf.keras.layers.Dropout(0.1))
-    model.add(tf.keras.layers.Bidirectional(
-        tf.keras.layers.LSTM(32, activation='softmax')))
-    model.add(tf.keras.layers.Dropout(0.2))
-    model.add(tf.keras.layers.Dense(future_target))
-    model.compile(
-        optimizer=tf.keras.optimizers.RMSprop(learning_rate=0.001), loss='mae')
-
-    # TRAIN
-    history = model.fit(X_train, y_train, epochs=15,
-                                            batch_size=50,
-                                            validation_data=(X_val, y_val))
-    
-    plt.plot(current_value, history.history['loss'][-1], 'ob')
-    plt.plot(current_value, history.history['val_loss'][-1], 'or')
-    
-    plot_train_history(history, 
-                       'Training and Validation Loss (Air Temperature)' +
-                       ' - size first layer: ' + str(current_value))
-    
-plt.legend(['Training loss', 'Validation loss'], loc='upper right', ncol=2)
-plt.xlabel('Prediction steps')
-plt.ylabel('Loss')
-
-##############################################################################
 past_history = 120
 future_target = 12
 step = 1
