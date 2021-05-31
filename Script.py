@@ -349,7 +349,7 @@ for current_value in parameter_optimisation:
     
     plot_train_history(history, 
                        'Training and Validation Loss (Air Temperature)' +
-                       ' - target: ' + str(current_value) + 'h')
+                       ' - size first layer: ' + str(current_value))
     
 plt.legend(['Training loss', 'Validation loss'], loc='upper right', ncol=2)
 plt.xlabel('Prediction steps')
